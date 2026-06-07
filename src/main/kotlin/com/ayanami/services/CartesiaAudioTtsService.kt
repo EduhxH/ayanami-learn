@@ -67,7 +67,7 @@ private data class PcmWavAudio(
 )
 
 class CartesiaAudioTtsService {
-    private val dotenv = dotenv()
+    private val dotenv = dotenv { ignoreIfMissing = true }
     private val httpClient = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })

@@ -68,7 +68,7 @@ private data class MemoryExtractionResponse(
 )
 
 class AiService {
-    private val dotenv = dotenv()
+    private val dotenv = dotenv { ignoreIfMissing = true }
 
     private val httpClient = HttpClient(CIO) {
         install(ContentNegotiation) {

@@ -17,7 +17,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 class EmailPasswordAuthService {
-    private val dotenv = dotenv()
+    private val dotenv = dotenv { ignoreIfMissing = true }
     private val json = Json { ignoreUnknownKeys = true }
     private val firebaseApiKey = System.getenv("FIREBASE_WEB_API_KEY")
         ?: dotenv["FIREBASE_WEB_API_KEY"]

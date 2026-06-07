@@ -36,7 +36,7 @@ class GeminiLiveVoiceService(
     private val chatMemoryService: ChatMemoryService
 ) {
     private val logger = LoggerFactory.getLogger(GeminiLiveVoiceService::class.java)
-    private val dotenv = dotenv()
+    private val dotenv = dotenv { ignoreIfMissing = true }
     private val json = Json { ignoreUnknownKeys = true }
     private val httpClient = HttpClient(CIO) {
         install(WebSockets)

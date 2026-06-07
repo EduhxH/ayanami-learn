@@ -10,7 +10,7 @@ import org.bson.codecs.configuration.CodecRegistry
 import org.bson.codecs.kotlinx.KotlinSerializerCodecProvider
 
 object MongoManager {
-    private val dotenv = dotenv()
+    private val dotenv = dotenv { ignoreIfMissing = true }
 
     private val connectionString = System.getenv("MONGO_URI")
         ?: dotenv["MONGO_URI"]

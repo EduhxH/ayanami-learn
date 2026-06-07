@@ -12,6 +12,7 @@ import com.ayanami.services.EmailPasswordAuthService
 import com.ayanami.services.GeminiLiveVoiceService
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.ReplaceOptions
+import io.github.cdimascio.dotenv.dotenv
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
 import io.ktor.http.ContentType
@@ -362,7 +363,7 @@ private suspend fun ApplicationCall.tryCreateAudioReplyUrl(
 
 private fun publicBaseUrl(): String {
     return System.getenv("PUBLIC_BASE_URL")
-        ?: io.github.cdimascio.dotenv.dotenv()["PUBLIC_BASE_URL"]
+        ?: dotenv { ignoreIfMissing = true }["PUBLIC_BASE_URL"]
         ?: "http://10.0.2.2:8080"
 }
 
@@ -457,7 +458,7 @@ private fun ByteArray.readShortLe(offset: Int): Short {
 
 private fun maybeSaveDebugVoiceUpload(file: File) {
     val enabled = System.getenv("DEBUG_SAVE_VOICE_UPLOADS")
-        ?: io.github.cdimascio.dotenv.dotenv()["DEBUG_SAVE_VOICE_UPLOADS"]
+        ?: dotenv { ignoreIfMissing = true }["DEBUG_SAVE_VOICE_UPLOADS"]
         ?: "false"
 
     if (enabled.lowercase() != "true") return

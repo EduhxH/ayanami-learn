@@ -11,7 +11,7 @@ import java.io.FileInputStream
 import java.util.Base64
 
 object FirebaseAdmin {
-    private val dotenv = dotenv()
+    private val dotenv = dotenv { ignoreIfMissing = true }
     private var initialized = false
 
     fun init() {
