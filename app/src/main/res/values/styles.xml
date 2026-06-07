@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.AyanamiLearn" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:colorAccent">@color/ayanami_blue</item>
+        <item name="android:windowBackground">@color/ayanami_background</item>
+    </style>
+</resources>
+

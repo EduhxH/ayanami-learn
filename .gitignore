@@ -1,0 +1,15 @@
+.gradle/
+build/
+**/build/
+.idea/
+app/.idea/
+
+local.properties
+.env
+
+*-firebase-adminsdk-*.json
+service-account*.json
+
+*.hprof
+*.log
+emulator-current.png

@@ -1,0 +1,42 @@
+services:
+  - type: web
+    runtime: docker
+    name: ayanami-learn-backend
+    repo: https://github.com/EduhxH/ayanami-learn.git
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DEBUG_SAVE_VOICE_UPLOADS
+        value: "false"
+      - key: GROQ_CHAT_MODEL
+        value: llama-3.1-8b-instant
+      - key: GROQ_TRANSCRIPTION_MODEL
+        value: whisper-large-v3-turbo
+      - key: GEMINI_LIVE_VOICE
+        value: Kore
+      - key: GEMINI_LIVE_MODEL
+        value: gemini-2.5-flash-native-audio-preview-12-2025
+      - key: MONGO_URI
+        sync: false
+      - key: FIREBASE_WEB_API_KEY
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CARTESIA_API_KEY
+        sync: false
+      - key: CARTESIA_VERSION
+        value: "2026-03-01"
+      - key: CARTESIA_TTS_MODEL
+        value: sonic-3.5
+      - key: CARTESIA_TTS_FORMAT
+        value: wav
+      - key: CARTESIA_TTS_SAMPLE_RATE
+        value: "44100"
+      - key: CARTESIA_TTS_SPEED
+        value: "0.78"
+      - key: PUBLIC_BASE_URL
+        sync: false

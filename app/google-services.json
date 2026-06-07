@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "944872961731",
+    "project_id": "ayanami-learn",
+    "storage_bucket": "ayanami-learn.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:944872961731:android:2e4280beae3b719b015476",
+        "android_client_info": {
+          "package_name": "com.yourname.ayanami.learn"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "944872961731-hbvkbncbch6bmj9o26s1h8pf3tubdc8p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yourname.ayanami.learn",
+            "certificate_hash": "a822007b994e00e54b798ff39690143d571d1c69"
+          }
+        },
+        {
+          "client_id": "944872961731-ugqgeoguusnevtorbe3oej2ab3a3o142.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDwdDrD_u--cuj3GrNPzQ5Q0zd50kbDNBQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "944872961731-ugqgeoguusnevtorbe3oej2ab3a3o142.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
