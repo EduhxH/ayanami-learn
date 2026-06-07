@@ -7,7 +7,9 @@ COPY gradle gradle
 COPY build.gradle.kts gradle.properties settings.backend.gradle.kts ./
 COPY src src
 
-RUN chmod +x gradlew && ./gradlew -c settings.backend.gradle.kts clean installShadowDist --no-daemon
+RUN sed -i '/^org.gradle.java.home=/d' gradle.properties \
+    && chmod +x gradlew \
+    && ./gradlew -c settings.backend.gradle.kts clean installShadowDist --no-daemon
 
 FROM eclipse-temurin:17-jre
 
