@@ -35,7 +35,10 @@ class AuthRepository @Inject constructor(
             email = email,
             password = password
         )
-        firebaseAuth.signInWithEmailAndPassword(email, password).await()
+        // Backend ja autenticou o usuario. O sign-in local do Firebase e opcional:
+        // em builds com assinatura nao registrada ele pode falhar (ApiException 10),
+        // entao nao deixamos isso bloquear o login.
+        runCatching { firebaseAuth.signInWithEmailAndPassword(email, password).await() }
         userPreferencesRepository.setAuthenticatedUser(
             firebaseUid = authResponse.firebaseUid,
             fullName = authResponse.fullName,
@@ -61,7 +64,7 @@ class AuthRepository @Inject constructor(
             password = password,
             nativeLanguage = nativeLanguage
         )
-        firebaseAuth.signInWithEmailAndPassword(email, password).await()
+        runCatching { firebaseAuth.signInWithEmailAndPassword(email, password).await() }
         userPreferencesRepository.setAuthenticatedUser(
             firebaseUid = authResponse.firebaseUid,
             fullName = authResponse.fullName,
