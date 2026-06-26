@@ -51,6 +51,7 @@ class LiveVoiceViewModel @Inject constructor(
     private var sessionJob: Job? = null
     private var outgoing = Channel<LiveVoiceOutbound>(Channel.BUFFERED)
     private var pendingListenStart = false
+    private var activityStarted = false
     private var sentAudioChunks = 0
     private var receivedAudioChunks = 0
 
@@ -97,6 +98,10 @@ class LiveVoiceViewModel @Inject constructor(
 
         pendingListenStart = false
         sentAudioChunks = 0
+        // Manual activity detection: tell Gemini Live a user turn is starting BEFORE any
+        // audio is queued, so the boundary is explicit (no silence-timer guessing).
+        outgoing.trySend(LiveVoiceOutbound.ActivityStart)
+        activityStarted = true
         val started = audioStreamer.start(
             onPcmChunk = { pcm ->
                 val base64 = Base64.encodeToString(pcm, Base64.NO_WRAP)
@@ -136,6 +141,10 @@ class LiveVoiceViewModel @Inject constructor(
                 }
             }
         )
+        if (!started) {
+            // Microphone never opened, so close the turn we just announced.
+            endActivityIfNeeded()
+        }
         _uiState.update {
             it.copy(
                 isListening = started,
@@ -148,12 +157,18 @@ class LiveVoiceViewModel @Inject constructor(
         }
     }
 
+    /** Closes the current Gemini Live user turn so it starts generating the reply immediately. */
+    private fun endActivityIfNeeded() {
+        if (activityStarted) {
+            if (_uiState.value.isConnected) outgoing.trySend(LiveVoiceOutbound.ActivityEnd)
+            activityStarted = false
+        }
+    }
+
     fun stopListening() {
         val hadAudio = sentAudioChunks > 0
         audioStreamer.stop()
-        if (_uiState.value.isConnected && hadAudio) {
-            outgoing.trySend(LiveVoiceOutbound.AudioStreamEnd)
-        }
+        endActivityIfNeeded()
         _uiState.update {
             it.copy(
                 isListening = false,
@@ -176,6 +191,7 @@ class LiveVoiceViewModel @Inject constructor(
 
     fun endSession() {
         pendingListenStart = false
+        activityStarted = false
         stopListening()
         outgoing.trySend(LiveVoiceOutbound.Stop)
         sessionJob?.cancel()
@@ -249,6 +265,7 @@ class LiveVoiceViewModel @Inject constructor(
                 receivedAudioChunks += 1
                 if (_uiState.value.isListening) {
                     audioStreamer.stop()
+                    endActivityIfNeeded()
                     _uiState.update {
                         it.copy(
                             isListening = false,

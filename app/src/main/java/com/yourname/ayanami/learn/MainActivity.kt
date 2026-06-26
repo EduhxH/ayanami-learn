@@ -21,6 +21,7 @@ import com.yourname.ayanami.learn.ui.screens.exercise.ExerciseSessionScreen
 import com.yourname.ayanami.learn.ui.screens.home.HomeScreen
 import com.yourname.ayanami.learn.ui.screens.settings.SettingsScreen
 import com.yourname.ayanami.learn.ui.screens.voice.LiveVoiceScreen
+import com.yourname.ayanami.learn.ui.feedback.LocalSoundEffectsEnabled
 import com.yourname.ayanami.learn.ui.localization.LocalAppStrings
 import com.yourname.ayanami.learn.ui.localization.appStrings
 import com.yourname.ayanami.learn.ui.theme.AyanamiLearnTheme
@@ -41,7 +42,10 @@ class MainActivity : ComponentActivity() {
                 darkTheme = preferences.darkTheme,
                 dynamicColor = false
             ) {
-                CompositionLocalProvider(LocalAppStrings provides preferences.nativeLanguage.appStrings()) {
+                CompositionLocalProvider(
+                    LocalAppStrings provides preferences.nativeLanguage.appStrings(),
+                    LocalSoundEffectsEnabled provides preferences.soundEffects
+                ) {
                     val navController = rememberNavController()
 
                     Surface(

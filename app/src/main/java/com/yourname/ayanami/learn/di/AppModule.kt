@@ -9,6 +9,7 @@ import com.yourname.ayanami.learn.R
 import com.yourname.ayanami.learn.data.remote.AuthApiService
 import com.yourname.ayanami.learn.data.remote.ChatApiService
 import com.yourname.ayanami.learn.data.remote.LiveVoiceApiService
+import com.yourname.ayanami.learn.data.remote.ProgressApiService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -84,5 +85,11 @@ object AppModule {
     @Singleton
     fun provideLiveVoiceApiService(httpClient: HttpClient): LiveVoiceApiService {
         return LiveVoiceApiService(httpClient)
+    }
+
+    @Provides
+    @Singleton
+    fun provideProgressApiService(httpClient: HttpClient): ProgressApiService {
+        return ProgressApiService(httpClient)
     }
 }

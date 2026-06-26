@@ -52,7 +52,7 @@ class GeminiLiveVoiceService(
         ?: ""
     private val model = System.getenv("GEMINI_LIVE_MODEL")
         ?: dotenv["GEMINI_LIVE_MODEL"]
-        ?: "gemini-3.1-flash-live-preview"
+        ?: "gemini-2.5-flash-native-audio-preview-12-2025"
     private val voiceName = System.getenv("GEMINI_LIVE_VOICE")
         ?: dotenv["GEMINI_LIVE_VOICE"]
         ?: "Kore"
@@ -138,6 +138,8 @@ class GeminiLiveVoiceService(
                                         send(Frame.Text(buildGeminiTextMessage(text)))
                                     }
                                 }
+                                "activityStart" -> send(Frame.Text(buildGeminiActivityStartMessage()))
+                                "activityEnd" -> send(Frame.Text(buildGeminiActivityEndMessage()))
                                 "stop" -> close(CloseReason(CloseReason.Codes.NORMAL, "Client stopped"))
                                 "audioStreamEnd" -> {
                                     send(Frame.Text(buildGeminiAudioStreamEndMessage()))
@@ -307,15 +309,15 @@ class GeminiLiveVoiceService(
                         }
                     }
                     putJsonObject("realtimeInputConfig") {
+                        // O app usa push-to-talk: o usuario toca para falar e toca de novo
+                        // para enviar. Por isso desligamos o VAD automatico e marcamos o
+                        // inicio/fim do turno explicitamente (activityStart / activityEnd).
+                        // Isso elimina o "timer de silencio" que fazia o Gemini Live
+                        // responder atrasado ou simplesmente nao responder.
                         putJsonObject("automaticActivityDetection") {
-                            put("disabled", false)
-                            put("startOfSpeechSensitivity", "START_SENSITIVITY_HIGH")
-                            put("endOfSpeechSensitivity", "END_SENSITIVITY_HIGH")
-                            put("prefixPaddingMs", 120)
-                            put("silenceDurationMs", 700)
+                            put("disabled", true)
                         }
                         put("activityHandling", "START_OF_ACTIVITY_INTERRUPTS")
-                        put("turnCoverage", "TURN_INCLUDES_ONLY_ACTIVITY")
                     }
                     putJsonObject("inputAudioTranscription") {}
                     putJsonObject("outputAudioTranscription") {}
@@ -387,6 +389,26 @@ class GeminiLiveVoiceService(
             buildJsonObject {
                 putJsonObject("realtimeInput") {
                     put("audioStreamEnd", true)
+                }
+            }
+        )
+    }
+
+    private fun buildGeminiActivityStartMessage(): String {
+        return json.encodeToString(
+            buildJsonObject {
+                putJsonObject("realtimeInput") {
+                    putJsonObject("activityStart") {}
+                }
+            }
+        )
+    }
+
+    private fun buildGeminiActivityEndMessage(): String {
+        return json.encodeToString(
+            buildJsonObject {
+                putJsonObject("realtimeInput") {
+                    putJsonObject("activityEnd") {}
                 }
             }
         )

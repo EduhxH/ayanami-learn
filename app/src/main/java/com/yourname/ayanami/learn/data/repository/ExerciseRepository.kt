@@ -2,6 +2,8 @@ package com.yourname.ayanami.learn.data.repository
 
 import com.yourname.ayanami.learn.data.local.NativeLanguage
 import com.yourname.ayanami.learn.data.model.ContentSourceRef
+import com.yourname.ayanami.learn.data.model.CurriculumLesson
+import com.yourname.ayanami.learn.data.model.CurriculumUnit
 import com.yourname.ayanami.learn.data.model.ExerciseItem
 import com.yourname.ayanami.learn.data.model.ExerciseLesson
 import com.yourname.ayanami.learn.data.model.ExerciseSkill
@@ -13,6 +15,56 @@ import javax.inject.Singleton
 
 @Singleton
 class ExerciseRepository @Inject constructor() {
+    /**
+     * Ordered curriculum used to build the learning path. Each entry maps to a real
+     * [ExerciseLesson]; progression/unlocking is driven by the learner's completed lessons.
+     */
+    fun getCurriculum(nativeLanguage: NativeLanguage = NativeLanguage.Portuguese): List<CurriculumUnit> {
+        return listOf(
+            CurriculumUnit(
+                unitId = "unit_1",
+                title = nativeText(nativeLanguage, "Unidade 1", "Розділ 1", "Раздел 1"),
+                subtitle = nativeText(
+                    nativeLanguage,
+                    "Conversa do dia a dia",
+                    "Щоденна розмова",
+                    "Повседневный разговор"
+                ),
+                lessons = listOf(
+                    curriculumLesson(ExerciseSkill.Reading, nativeLanguage),
+                    curriculumLesson(ExerciseSkill.Listening, nativeLanguage),
+                    curriculumLesson(ExerciseSkill.Speaking, nativeLanguage),
+                    curriculumLesson(ExerciseSkill.Writing, nativeLanguage)
+                )
+            ),
+            CurriculumUnit(
+                unitId = "unit_2",
+                title = nativeText(nativeLanguage, "Unidade 2", "Розділ 2", "Раздел 2"),
+                subtitle = nativeText(
+                    nativeLanguage,
+                    "Prática e desafio",
+                    "Практика й виклик",
+                    "Практика и вызов"
+                ),
+                lessons = listOf(
+                    curriculumLesson(ExerciseSkill.Daily, nativeLanguage),
+                    curriculumLesson(ExerciseSkill.Practice, nativeLanguage),
+                    curriculumLesson(ExerciseSkill.League, nativeLanguage)
+                )
+            )
+        )
+    }
+
+    private fun curriculumLesson(skill: ExerciseSkill, language: NativeLanguage): CurriculumLesson {
+        val lesson = getLesson(skill.key, language)
+        return CurriculumLesson(
+            lessonId = lesson.id,
+            route = skill.key,
+            skill = skill,
+            title = lesson.title
+        )
+    }
+
     fun getLesson(skillKey: String, nativeLanguage: NativeLanguage = NativeLanguage.Portuguese): ExerciseLesson {
         val skill = ExerciseSkill.fromKey(skillKey)
         val lesson = when (skill) {

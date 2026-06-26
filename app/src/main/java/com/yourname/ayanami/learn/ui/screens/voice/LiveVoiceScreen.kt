@@ -24,8 +24,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Close
@@ -47,12 +49,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.yourname.ayanami.learn.R
 import com.yourname.ayanami.learn.ui.components.ReiAssetImage
+import com.yourname.ayanami.learn.ui.feedback.rememberClickFeedback
 import com.yourname.ayanami.learn.ui.localization.AppStrings
 import com.yourname.ayanami.learn.ui.localization.LocalAppStrings
 import com.yourname.ayanami.learn.ui.viewmodel.LiveVoiceUiState
@@ -65,6 +69,7 @@ fun LiveVoiceScreen(
 ) {
     val strings = LocalAppStrings.current
     val context = LocalContext.current
+    val clickFeedback = rememberClickFeedback()
     val state by viewModel.uiState.collectAsState()
     val transition = rememberInfiniteTransition(label = "voice-call")
     val pulse by transition.animateFloat(
@@ -97,11 +102,24 @@ fun LiveVoiceScreen(
         }
     }
 
+    val startMic: () -> Unit = {
+        if (
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            viewModel.startListening()
+        } else {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose { viewModel.endSession() }
     }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(VoiceBackground)
@@ -110,52 +128,95 @@ fun LiveVoiceScreen(
             title = strings.ayanamiLive,
             status = state.callStatus(strings),
             onClose = {
+                clickFeedback()
                 viewModel.endSession()
                 onBack()
             }
         )
 
-        VoiceAvatarStage(
-            state = state,
-            pulse = pulse,
-            avatarScale = avatarScale,
-            modifier = Modifier.align(Alignment.Center)
-        )
-
-        state.error?.let { error ->
-            Text(
-                text = error,
-                color = VoiceError,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp,
-                lineHeight = 17.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(top = 190.dp)
-                    .padding(horizontal = 32.dp)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            VoiceAvatarStage(
+                state = state,
+                pulse = pulse,
+                avatarScale = avatarScale
             )
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            Text(
+                text = state.callStatus(strings),
+                color = Color.White,
+                fontWeight = FontWeight.Black,
+                fontSize = 22.sp,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val error = state.error
+            if (error != null) {
+                Text(
+                    text = error,
+                    color = VoiceError,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                Text(
+                    text = state.callHint(strings),
+                    color = VoiceMuted,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp,
+                    lineHeight = 19.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            val caption = state.liveCaption()
+            if (caption.isNotBlank()) {
+                Spacer(modifier = Modifier.height(18.dp))
+                Text(
+                    text = caption,
+                    color = Color.White.copy(alpha = 0.78f),
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp,
+                    lineHeight = 19.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 320.dp)
+                )
+            }
         }
 
         VoiceCallControls(
+            strings = strings,
             isListening = state.isListening,
-            isSpeaking = state.isSpeaking,
             onMic = {
+                clickFeedback()
                 when {
-                    state.isSpeaking -> viewModel.interruptPlayback()
+                    state.isSpeaking -> {
+                        viewModel.interruptPlayback()
+                        startMic()
+                    }
                     state.isListening -> viewModel.stopListening()
-                    ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.RECORD_AUDIO
-                    ) == PackageManager.PERMISSION_GRANTED -> viewModel.startListening()
-                    else -> permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    else -> startMic()
                 }
             },
             onEnd = {
+                clickFeedback()
                 viewModel.endSession()
                 onBack()
-            },
-            modifier = Modifier.align(Alignment.BottomCenter)
+            }
         )
     }
 }
@@ -166,16 +227,16 @@ private fun VoiceHeader(
     status: String,
     onClose: () -> Unit
 ) {
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 20.dp)
-            .padding(horizontal = 20.dp)
+            .statusBarsPadding()
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(
             onClick = onClose,
             modifier = Modifier
-                .align(Alignment.CenterStart)
                 .size(48.dp)
                 .clip(CircleShape)
                 .background(VoiceControlDark)
@@ -184,13 +245,15 @@ private fun VoiceHeader(
         }
         Column(
             modifier = Modifier
-                .align(Alignment.Center)
-                .padding(horizontal = 64.dp),
+                .weight(1f)
+                .padding(horizontal = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(title, color = Color.White, fontWeight = FontWeight.Black, fontSize = 16.sp)
             Text(status, color = VoiceBlue, fontWeight = FontWeight.Bold, fontSize = 12.sp)
         }
+        // Keeps the title visually centered against the close button on the left.
+        Spacer(modifier = Modifier.width(48.dp))
     }
 }
 
@@ -251,52 +314,58 @@ private fun VoiceAvatarStage(
 
 @Composable
 private fun VoiceCallControls(
+    strings: AppStrings,
     isListening: Boolean,
-    isSpeaking: Boolean,
     onMic: () -> Unit,
     onEnd: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
+            .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(bottom = 34.dp),
-        horizontalArrangement = Arrangement.spacedBy(32.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(top = 8.dp, bottom = 30.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.Top
     ) {
-        RoundCallButton(
+        CallButtonWithLabel(
+            label = strings.voiceMic,
             icon = if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
             background = if (isListening) VoiceBlue.copy(alpha = 0.26f) else VoiceControlDark,
-            iconTint = Color.White,
-            size = 68.dp,
+            size = 70.dp,
             onClick = onMic
         )
-        RoundCallButton(
+        Spacer(modifier = Modifier.width(44.dp))
+        CallButtonWithLabel(
+            label = strings.voiceEnd,
             icon = Icons.Default.CallEnd,
             background = VoiceRed,
-            iconTint = Color.White,
-            size = 78.dp,
+            size = 70.dp,
             onClick = onEnd
         )
     }
 }
 
 @Composable
-private fun RoundCallButton(
+private fun CallButtonWithLabel(
+    label: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     background: Color,
-    iconTint: Color,
     size: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit
 ) {
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(background)
-    ) {
-        Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(size * 0.42f))
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(background)
+        ) {
+            Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(size * 0.42f))
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(label, color = VoiceMuted, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
     }
 }
 
@@ -312,9 +381,27 @@ private fun LiveVoiceUiState.callStatus(strings: AppStrings): String {
     }
 }
 
+private fun LiveVoiceUiState.callHint(strings: AppStrings): String {
+    return when {
+        isConnecting -> strings.voiceHintConnecting
+        isSpeaking -> strings.voiceHintSpeaking
+        isListening -> strings.voiceHintListening
+        else -> strings.voiceHintReady
+    }
+}
+
+private fun LiveVoiceUiState.liveCaption(): String {
+    return when {
+        isSpeaking && assistantTranscript.isNotBlank() -> assistantTranscript.trim()
+        isListening && userTranscript.isNotBlank() -> userTranscript.trim()
+        else -> ""
+    }
+}
+
 private val VoiceBackground = Color(0xFF0E1728)
 private val VoiceControlDark = Color(0xFF172235)
 private val VoiceAvatarRing = Color(0xFF243046)
 private val VoiceBlue = Color(0xFF4A90E2)
 private val VoiceRed = Color(0xFFFF2D3D)
 private val VoiceError = Color(0xFFFF6B7A)
+private val VoiceMuted = Color(0xFF93A4BE)

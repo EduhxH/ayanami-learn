@@ -24,6 +24,8 @@ import javax.inject.Inject
 sealed class LiveVoiceOutbound {
     data class Audio(val base64Pcm: String) : LiveVoiceOutbound()
     data class Text(val text: String) : LiveVoiceOutbound()
+    data object ActivityStart : LiveVoiceOutbound()
+    data object ActivityEnd : LiveVoiceOutbound()
     data object AudioStreamEnd : LiveVoiceOutbound()
     data object Stop : LiveVoiceOutbound()
 }
@@ -113,6 +115,12 @@ class LiveVoiceApiService @Inject constructor(
                     is LiveVoiceOutbound.Text -> {
                         put("type", "text")
                         put("text", text)
+                    }
+                    LiveVoiceOutbound.ActivityStart -> {
+                        put("type", "activityStart")
+                    }
+                    LiveVoiceOutbound.ActivityEnd -> {
+                        put("type", "activityEnd")
                     }
                     LiveVoiceOutbound.AudioStreamEnd -> {
                         put("type", "audioStreamEnd")

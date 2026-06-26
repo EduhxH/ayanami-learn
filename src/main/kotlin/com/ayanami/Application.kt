@@ -10,6 +10,8 @@ import com.ayanami.services.CartesiaAudioTtsService
 import com.ayanami.services.ChatMemoryService
 import com.ayanami.services.EmailPasswordAuthService
 import com.ayanami.services.GeminiLiveVoiceService
+import com.ayanami.services.LearnerProgressService
+import com.ayanami.models.LessonCompletionRequest
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.ReplaceOptions
 import io.github.cdimascio.dotenv.dotenv
@@ -49,6 +51,7 @@ fun Application.module() {
     val cartesiaAudioTtsService = CartesiaAudioTtsService()
     val chatMemoryService = ChatMemoryService(aiService)
     val geminiLiveVoiceService = GeminiLiveVoiceService(chatMemoryService)
+    val learnerProgressService = LearnerProgressService()
 
     // Initializes Firebase Admin when credentials are available.
     FirebaseAdmin.init()
@@ -81,6 +84,21 @@ fun Application.module() {
         get("/api/memory/{userId}") {
             val userId = call.parameters["userId"].toChatUserId()
             call.respond(chatMemoryService.listMemories(userId))
+        }
+
+        get("/api/progress/{userId}") {
+            val userId = call.parameters["userId"].toChatUserId()
+            call.respond(learnerProgressService.getProgress(userId))
+        }
+
+        post("/api/progress/{userId}/complete") {
+            val userId = call.parameters["userId"].toChatUserId()
+            val request = call.receive<LessonCompletionRequest>()
+            if (request.lessonId.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, ErrorResponse("lessonId is required."))
+                return@post
+            }
+            call.respond(learnerProgressService.recordCompletion(userId, request))
         }
 
         webSocket("/api/live/voice") {

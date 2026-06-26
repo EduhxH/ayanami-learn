@@ -1,14 +1,23 @@
 package com.yourname.ayanami.learn.ui.screens.home
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,13 +48,12 @@ import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,20 +65,28 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.yourname.ayanami.learn.R
+import com.yourname.ayanami.learn.data.model.CurriculumLesson
+import com.yourname.ayanami.learn.data.model.CurriculumUnit
+import com.yourname.ayanami.learn.data.model.ExerciseSkill
 import com.yourname.ayanami.learn.data.model.LearnerProgress
 import com.yourname.ayanami.learn.ui.components.ReiAssetImage
+import com.yourname.ayanami.learn.ui.feedback.rememberClickFeedback
+import com.yourname.ayanami.learn.ui.localization.LocalAppStrings
 import com.yourname.ayanami.learn.ui.viewmodel.HomeViewModel
+import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 @Composable
 fun HomeScreen(
@@ -82,6 +98,16 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val progress by viewModel.progress.collectAsState()
+    val curriculum by viewModel.curriculum.collectAsState()
+
+    val completedLessonIds = progress.completedLessonIds
+    val activeLessonId = remember(curriculum, completedLessonIds) {
+        curriculum.flatMap { it.lessons }.firstOrNull { it.lessonId !in completedLessonIds }?.lessonId
+    }
+    val activeUnit = remember(curriculum, activeLessonId) {
+        curriculum.firstOrNull { unit -> unit.lessons.any { it.lessonId == activeLessonId } }
+            ?: curriculum.lastOrNull()
+    }
 
     Scaffold(
         containerColor = AyanamiCanvas,
@@ -102,10 +128,14 @@ fun HomeScreen(
         ) {
             LearningPathHeader(
                 progress = progress,
+                activeUnit = activeUnit,
                 onOpenSettings = onOpenSettings,
                 onLogout = onLogout
             )
             LearningPath(
+                curriculum = curriculum,
+                completedLessonIds = completedLessonIds,
+                activeLessonId = activeLessonId,
                 onOpenExercise = onOpenExercise
             )
         }
@@ -115,6 +145,7 @@ fun HomeScreen(
 @Composable
 private fun LearningPathHeader(
     progress: LearnerProgress,
+    activeUnit: CurriculumUnit?,
     onOpenSettings: () -> Unit,
     onLogout: () -> Unit
 ) {
@@ -147,7 +178,10 @@ private fun LearningPathHeader(
             )
         }
 
-        GummyUnitBanner()
+        GummyUnitBanner(
+            title = activeUnit?.title?.uppercase() ?: "UNIT 1",
+            subtitle = activeUnit?.subtitle ?: "Daily conversation"
+        )
     }
 }
 
@@ -221,7 +255,10 @@ private fun MiniProfileButton(
 }
 
 @Composable
-private fun GummyUnitBanner() {
+private fun GummyUnitBanner(
+    title: String,
+    subtitle: String
+) {
     Box(modifier = Modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
@@ -245,13 +282,13 @@ private fun GummyUnitBanner() {
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = "UNIT 1, PATH 1",
+                    text = title,
                     color = Color.White.copy(alpha = 0.86f),
                     fontWeight = FontWeight.Black,
                     fontSize = 16.sp
                 )
                 Text(
-                    text = "Daily conversation",
+                    text = subtitle,
                     color = Color.White,
                     fontWeight = FontWeight.Black,
                     fontSize = 25.sp,
@@ -278,85 +315,95 @@ private fun GummyUnitBanner() {
 
 @Composable
 private fun LearningPath(
+    curriculum: List<CurriculumUnit>,
+    completedLessonIds: Set<String>,
+    activeLessonId: String?,
     onOpenExercise: (String) -> Unit
 ) {
     val scrollState = rememberScrollState()
+    val strings = LocalAppStrings.current
+    val clickFeedback = rememberClickFeedback()
+    val configuration = LocalConfiguration.current
+
+    val entries = remember(curriculum, completedLessonIds, activeLessonId) {
+        buildPathEntries(curriculum, completedLessonIds, activeLessonId)
+    }
 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
     ) {
-        val containerWidth = maxWidth
         val density = LocalDensity.current
+        val containerWidthPx = with(density) { maxWidth.toPx() }
         val nodeSize = 76.dp
         val treasureSize = 92.dp
-        val pathItems = learningPathItems
-        val pathPoints = pathItems.filterIsInstance<PathItem.Lesson>()
+        val spacing = 132.dp
+        val topPadding = 36.dp
+        val nodePx = with(density) { nodeSize.toPx() }
+        val viewportCenterPx = with(density) { configuration.screenHeightDp.dp.toPx() } / 2f
+
+        val centers = remember(entries.size, containerWidthPx, density) {
+            List(entries.size) { index ->
+                val fraction = (0.5f + WAVE_AMPLITUDE * sin(index * WAVE_FREQUENCY + WAVE_PHASE))
+                    .coerceIn(0.18f, 0.82f)
+                val centerX = containerWidthPx * fraction
+                val centerY = with(density) { (topPadding + spacing * index).toPx() } + nodePx / 2f
+                Offset(centerX, centerY)
+            }
+        }
+
+        val totalHeight = topPadding + spacing * (entries.size - 1).coerceAtLeast(0) + nodeSize + 130.dp
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(1_150.dp)
+                .height(totalHeight)
         ) {
             Canvas(modifier = Modifier.matchParentSize()) {
-                drawLearningPath(
-                    lessons = pathPoints,
-                    nodeSize = nodeSize,
-                    density = density
-                )
+                drawLearningPath(centers)
             }
 
             ReiAssetImage(
                 resId = R.drawable.reiayanamiplush,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .offset(x = 34.dp, y = 0.dp)
-                    .size(width = 158.dp, height = 158.dp),
+                    .offset(x = 22.dp, y = 0.dp)
+                    .size(150.dp),
                 contentDescription = "Rei Ayanami"
             )
 
-            pathItems.forEach { item ->
-                when (item) {
-                    is PathItem.Lesson -> {
-                        val x = with(density) {
-                            ((containerWidth - nodeSize).toPx() * item.x).roundToInt()
-                        }
-                        val y = with(density) { item.y.toPx().roundToInt() }
+            entries.forEachIndexed { index, entry ->
+                val center = centers[index]
+                when (entry) {
+                    is PathEntry.LessonEntry -> {
+                        val offsetX = (center.x - nodePx / 2f).roundToInt()
+                        val offsetY = (center.y - nodePx / 2f).roundToInt()
                         LessonNode(
-                            icon = item.skill.icon,
-                            state = item.state,
+                            icon = entry.lesson.skill.pathIcon(),
+                            state = entry.state,
+                            startLabel = if (entry.state == LessonState.Active) strings.startLesson else null,
                             modifier = Modifier
-                                .offset { IntOffset(x, y) }
-                                .size(nodeSize),
-                            onClick = when {
-                                item.state == LessonState.Locked -> ({})
-                                else -> ({ onOpenExercise(item.skill.route) })
+                                .offset { IntOffset(offsetX, offsetY) }
+                                .size(nodeSize)
+                                .scrollReveal(scrollState, center.y, viewportCenterPx),
+                            onClick = {
+                                if (entry.state != LessonState.Locked) {
+                                    clickFeedback()
+                                    onOpenExercise(entry.lesson.route)
+                                }
                             }
                         )
                     }
-                    is PathItem.Treasure -> {
-                        val x = with(density) {
-                            ((containerWidth - treasureSize).toPx() * item.x).roundToInt()
-                        }
-                        val y = with(density) { item.y.toPx().roundToInt() }
+                    is PathEntry.TreasureEntry -> {
+                        val treasurePx = with(density) { treasureSize.toPx() }
+                        val offsetX = (center.x - treasurePx / 2f).roundToInt()
+                        val offsetY = (center.y - treasurePx / 2f).roundToInt()
                         TreasureChest(
                             modifier = Modifier
-                                .offset { IntOffset(x, y) }
+                                .offset { IntOffset(offsetX, offsetY) }
                                 .size(treasureSize)
-                        )
-                    }
-                    is PathItem.Mascot -> {
-                        val x = with(density) {
-                            ((containerWidth - 118.dp).toPx() * item.x).roundToInt()
-                        }
-                        val y = with(density) { item.y.toPx().roundToInt() }
-                        ReiAssetImage(
-                            resId = R.drawable.reiayanamiplush,
-                            modifier = Modifier
-                                .offset { IntOffset(x, y) }
-                                .size(width = 118.dp, height = 140.dp),
-                            contentDescription = "Rei Ayanami"
+                                .scrollReveal(scrollState, center.y, viewportCenterPx)
                         )
                     }
                 }
@@ -365,33 +412,37 @@ private fun LearningPath(
     }
 }
 
-private fun DrawScope.drawLearningPath(
-    lessons: List<PathItem.Lesson>,
-    nodeSize: Dp,
-    density: androidx.compose.ui.unit.Density
-) {
-    if (lessons.size < 2) return
-
-    val nodePx = with(density) { nodeSize.toPx() }
-    val centers = lessons.map { lesson ->
-        Offset(
-            x = (size.width - nodePx) * lesson.x + nodePx / 2f,
-            y = with(density) { lesson.y.toPx() } + nodePx / 2f
-        )
+private fun buildPathEntries(
+    curriculum: List<CurriculumUnit>,
+    completedLessonIds: Set<String>,
+    activeLessonId: String?
+): List<PathEntry> {
+    return buildList {
+        curriculum.forEachIndexed { unitIndex, unit ->
+            unit.lessons.forEach { lesson ->
+                val state = when {
+                    lesson.lessonId in completedLessonIds -> LessonState.Done
+                    lesson.lessonId == activeLessonId -> LessonState.Active
+                    else -> LessonState.Locked
+                }
+                add(PathEntry.LessonEntry(lesson, state))
+            }
+            if (unitIndex < curriculum.lastIndex) {
+                val unitCleared = unit.lessons.all { it.lessonId in completedLessonIds }
+                add(PathEntry.TreasureEntry(unlocked = unitCleared))
+            }
+        }
     }
+}
+
+private fun DrawScope.drawLearningPath(centers: List<Offset>) {
+    if (centers.size < 2) return
 
     val path = Path().apply {
         moveTo(centers.first().x, centers.first().y)
         centers.zipWithNext().forEach { (start, end) ->
             val controlY = (start.y + end.y) / 2f
-            cubicTo(
-                start.x,
-                controlY,
-                end.x,
-                controlY,
-                end.x,
-                end.y
-            )
+            cubicTo(start.x, controlY, end.x, controlY, end.x, end.y)
         }
     }
 
@@ -411,6 +462,7 @@ private fun DrawScope.drawLearningPath(
 private fun LessonNode(
     icon: ImageVector,
     state: LessonState,
+    startLabel: String?,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -426,13 +478,30 @@ private fun LessonNode(
     }
     val contentColor = if (state == LessonState.Locked) AyanamiMuted else Color.White
 
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.9f else 1f,
+        animationSpec = tween(120, easing = FastOutSlowInEasing),
+        label = "node-press"
+    )
+
     Box(
-        modifier = modifier.clickable(enabled = state != LessonState.Locked, onClick = onClick),
+        modifier = modifier.clickable(
+            interactionSource = interaction,
+            indication = null,
+            enabled = state != LessonState.Locked,
+            onClick = onClick
+        ),
         contentAlignment = Alignment.TopCenter
     ) {
+        if (state == LessonState.Active) {
+            ActivePulse(modifier = Modifier.matchParentSize())
+        }
         Box(
             modifier = Modifier
                 .matchParentSize()
+                .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
                 .offset(y = 8.dp)
                 .clip(CircleShape)
                 .background(shadowColor)
@@ -440,6 +509,7 @@ private fun LessonNode(
         Box(
             modifier = Modifier
                 .matchParentSize()
+                .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
                 .padding(bottom = 8.dp)
                 .clip(CircleShape)
                 .background(topColor),
@@ -455,7 +525,90 @@ private fun LessonNode(
                 NodeGloss()
             }
         }
+        if (startLabel != null) {
+            StartBubble(
+                label = startLabel,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = (-32).dp)
+            )
+        }
     }
+}
+
+@Composable
+private fun ActivePulse(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "node-pulse")
+    val scale by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1_400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulse-scale"
+    )
+    val alpha by transition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1_400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulse-alpha"
+    )
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                this.alpha = alpha
+            }
+            .clip(CircleShape)
+            .background(AyanamiBlue)
+    )
+}
+
+@Composable
+private fun StartBubble(label: String, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "start-bubble")
+    val lift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = -4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(820, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "bubble-lift"
+    )
+    Box(
+        modifier = modifier
+            .graphicsLayer { translationY = lift }
+            .clip(RoundedCornerShape(11.dp))
+            .background(Color.White)
+            .padding(horizontal = 13.dp, vertical = 5.dp)
+    ) {
+        Text(
+            text = label,
+            color = AyanamiDeep,
+            fontWeight = FontWeight.Black,
+            fontSize = 12.sp
+        )
+    }
+}
+
+private fun Modifier.scrollReveal(
+    scrollState: ScrollState,
+    centerY: Float,
+    viewportCenterPx: Float
+): Modifier = graphicsLayer {
+    if (viewportCenterPx <= 0f) return@graphicsLayer
+    val onScreenY = centerY - scrollState.value
+    val distance = (abs(onScreenY - viewportCenterPx) / viewportCenterPx).coerceIn(0f, 1f)
+    val nodeScale = 1f - 0.12f * distance
+    scaleX = nodeScale
+    scaleY = nodeScale
+    alpha = 1f - 0.32f * distance
 }
 
 @Composable
@@ -585,12 +738,16 @@ private fun BottomNavIcon(
 ) {
     val size = if (active) 58.dp else 48.dp
     val iconSize = if (active) 31.dp else 28.dp
+    val clickFeedback = rememberClickFeedback()
     Box(
         modifier = Modifier
             .size(size)
             .clip(RoundedCornerShape(18.dp))
             .background(if (active) AyanamiIce else Color.Transparent)
-            .clickable(enabled = onClick != null) { onClick?.invoke() },
+            .clickable(enabled = onClick != null) {
+                clickFeedback()
+                onClick?.invoke()
+            },
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -602,51 +759,32 @@ private fun BottomNavIcon(
     }
 }
 
+private fun ExerciseSkill.pathIcon(): ImageVector {
+    return when (this) {
+        ExerciseSkill.Reading -> Icons.Default.MenuBook
+        ExerciseSkill.Listening -> Icons.Default.Headphones
+        ExerciseSkill.Speaking -> Icons.Default.Mic
+        ExerciseSkill.Writing -> Icons.Default.Edit
+        ExerciseSkill.Daily -> Icons.Default.Inventory2
+        ExerciseSkill.Practice -> Icons.Default.FitnessCenter
+        ExerciseSkill.League -> Icons.Default.Shield
+    }
+}
+
 private enum class LessonState {
     Active,
     Done,
     Locked
 }
 
-private enum class Skill(val icon: ImageVector, val route: String) {
-    Reading(Icons.Default.MenuBook, "reading"),
-    Listening(Icons.Default.Headphones, "listening"),
-    Speaking(Icons.Default.Mic, "speaking"),
-    Writing(Icons.Default.Edit, "writing")
+private sealed interface PathEntry {
+    data class LessonEntry(val lesson: CurriculumLesson, val state: LessonState) : PathEntry
+    data class TreasureEntry(val unlocked: Boolean) : PathEntry
 }
 
-@Immutable
-private sealed interface PathItem {
-    data class Lesson(
-        val skill: Skill,
-        val state: LessonState,
-        val x: Float,
-        val y: Dp
-    ) : PathItem
-
-    data class Treasure(
-        val x: Float,
-        val y: Dp
-    ) : PathItem
-
-    data class Mascot(
-        val x: Float,
-        val y: Dp
-    ) : PathItem
-}
-
-private val learningPathItems = listOf(
-    PathItem.Lesson(Skill.Reading, LessonState.Active, x = 0.69f, y = 56.dp),
-    PathItem.Lesson(Skill.Listening, LessonState.Done, x = 0.53f, y = 186.dp),
-    PathItem.Lesson(Skill.Speaking, LessonState.Done, x = 0.28f, y = 322.dp),
-    PathItem.Treasure(x = 0.50f, y = 278.dp),
-    PathItem.Lesson(Skill.Writing, LessonState.Done, x = 0.23f, y = 470.dp),
-    PathItem.Mascot(x = 0.62f, y = 430.dp),
-    PathItem.Lesson(Skill.Reading, LessonState.Done, x = 0.48f, y = 618.dp),
-    PathItem.Lesson(Skill.Speaking, LessonState.Active, x = 0.68f, y = 762.dp),
-    PathItem.Lesson(Skill.Listening, LessonState.Locked, x = 0.43f, y = 910.dp),
-    PathItem.Lesson(Skill.Writing, LessonState.Locked, x = 0.20f, y = 1_036.dp)
-)
+private const val WAVE_AMPLITUDE = 0.30f
+private const val WAVE_FREQUENCY = 0.95f
+private const val WAVE_PHASE = 0.6f
 
 private val AyanamiBlue = Color(0xFF5B8CFF)
 private val AyanamiDeep = Color(0xFF3B6BE0)

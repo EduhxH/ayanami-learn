@@ -82,6 +82,22 @@ enum class ExerciseSkill(
     }
 }
 
+/** One ordered step in the learning path, backed by a real [ExerciseLesson]. */
+data class CurriculumLesson(
+    val lessonId: String,
+    val route: String,
+    val skill: ExerciseSkill,
+    val title: String
+)
+
+/** A group of ordered lessons shown as one section of the path. */
+data class CurriculumUnit(
+    val unitId: String,
+    val title: String,
+    val subtitle: String,
+    val lessons: List<CurriculumLesson>
+)
+
 data class ExerciseLesson(
     val id: String,
     val unitTitle: String,
